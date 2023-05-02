@@ -1,6 +1,6 @@
 # FMAAC(Fusion-Multiactor-Attention-Critic for Multiple-Unmanned-Aerial-Vehicle Navigation Control)
 
-Code of [FMAAC](https://www.mdpi.com/1996-1073/15/19/7426)(MDPI Energies 2022, 15(19), 7426 (SCIE)
+Code of FMAAC [paper link](https://www.mdpi.com/1996-1073/15/19/7426)
 
 
 <img src="fmaac_architecture.png">
