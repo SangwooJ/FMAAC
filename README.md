@@ -5,6 +5,10 @@ Code of [FMAAC](https://www.mdpi.com/1996-1073/15/19/7426)(MDPI Energies 2022, 1
 
 <img src="fmaac_architecture.png">
 
+
+
+
+
 __________________________________________
 
 
