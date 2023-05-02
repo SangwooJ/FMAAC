@@ -31,6 +31,10 @@ class AttentionCritic(nn.Module):
         self.critics = nn.ModuleList()
 
         self.state_encoders = nn.ModuleList()
+
+        #added for cosdis
+        self.cosdis = nn.Linear(self.nagents * hidden_dim, hidden_dim)
+
         # iterate over agents
         for sdim, adim in sa_sizes:
             idim = sdim + adim
@@ -43,8 +47,8 @@ class AttentionCritic(nn.Module):
             encoder.add_module('enc_nl', nn.LeakyReLU())
             self.critic_encoders.append(encoder)
             critic = nn.Sequential()
-            critic.add_module('critic_fc1', nn.Linear(2 * hidden_dim,
-                                                      hidden_dim))
+            critic.add_module('critic_fc1', nn.Linear(3 * hidden_dim,
+                                                      hidden_dim)) #fixed
             critic.add_module('critic_nl', nn.LeakyReLU())
             critic.add_module('critic_fc2', nn.Linear(hidden_dim, odim))
             self.critics.append(critic)
@@ -105,6 +109,8 @@ class AttentionCritic(nn.Module):
             agents = range(len(self.critic_encoders))
         states = [s for s, a in inps]
         actions = [a for s, a in inps]
+        
+        
         inps = [torch.cat((s, a), dim=1) for s, a in inps]
         # extract state-action encoding for each agent
         sa_encodings = [encoder(inp) for encoder, inp in zip(self.critic_encoders, inps)]
@@ -139,13 +145,36 @@ class AttentionCritic(nn.Module):
                 other_all_values[i].append(other_values)
                 all_attend_logits[i].append(attend_logits)
                 all_attend_probs[i].append(attend_weights)
+
+        # calculate cos dissimilarity
+        cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+        cos_dis_list = []
+        for i in range(self.nagents): #num of agen
+            cos_dis = []
+            for j in range(self.nagents): # cos_dis of i and js
+                val = cos(sa_encodings[i],sa_encodings[j]).unsqueeze(1)* -1
+                val[val < 0] = 0 
+                cos_dis.append(val)
+            cos_dis_list.append(cos_dis)
+
+        cos_dis_layer_in_all = []
+        for i in range(self.nagents):
+            cos_dis_layer_in = torch.cat((cos_dis_list[i][0] * sa_encodings[0], cos_dis_list[i][1] * sa_encodings[1], cos_dis_list[i][2] * sa_encodings[2],
+                cos_dis_list[i][3] * sa_encodings[3], cos_dis_list[i][4] * sa_encodings[4]), dim=1)
+            cos_dis_layer_in_all.append(cos_dis_layer_in)
+        # print(cos_dis_layer_in_all[0].size()) 
+        cos_dis_layer_out_all = []
+        for i in range(self.nagents):
+            cos_dis_layer_out_all.append(self.cosdis(cos_dis_layer_in_all[i])) #out 1024*128
+        # print(cos_dis_layer_out_all[0].size())
+
         # calculate Q per agent
         all_rets = []
         for i, a_i in enumerate(agents):
             head_entropies = [(-((probs + 1e-8).log() * probs).squeeze().sum(1)
                                .mean()) for probs in all_attend_probs[i]]
             agent_rets = []
-            critic_in = torch.cat((s_encodings[i], *other_all_values[i]), dim=1)
+            critic_in = torch.cat((s_encodings[i], *other_all_values[i], cos_dis_layer_out_all[i]), dim=1)
             all_q = self.critics[a_i](critic_in)
             int_acs = actions[a_i].max(dim=1, keepdim=True)[1]
             q = all_q.gather(1, int_acs)
@@ -171,6 +200,3 @@ class AttentionCritic(nn.Module):
             else:
                 all_rets.append(agent_rets)
         if len(all_rets) == 1:
-            return all_rets[0]
-        else:
-            return all_rets

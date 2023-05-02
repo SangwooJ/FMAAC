@@ -18,12 +18,22 @@ class BasePolicy(nn.Module):
         """
         super(BasePolicy, self).__init__()
 
+        input_dim1 = 27
+        input_dim2 = 9
+        input_dim3 = 48
+
         if norm_in:  # normalize inputs
-            self.in_fn = nn.BatchNorm1d(input_dim, affine=False)
+            self.in_fn1 = lambda x: x
+            self.in_fn2 = nn.BatchNorm1d(input_dim2, affine=False)
+            self.in_fn3 = nn.BatchNorm1d(input_dim3, affine=False)
         else:
-            self.in_fn = lambda x: x
-        self.fc1 = nn.Linear(input_dim + onehot_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+            self.in_fn1 = lambda x: x
+            self.in_fn2 = lambda x: x
+            self.in_fn3 = lambda x: x
+        self.fc1_1 = nn.Linear(input_dim1, hidden_dim)
+        self.fc1_2 = nn.Linear(input_dim2, hidden_dim // 2)
+        self.fc1_3 = nn.Linear(input_dim3, hidden_dim)
+        self.fc2 = nn.Linear(2*hidden_dim + (hidden_dim//2), hidden_dim)
         self.fc3 = nn.Linear(hidden_dim, out_dim)
         self.nonlin = nonlin
 
@@ -35,16 +45,23 @@ class BasePolicy(nn.Module):
         Outputs:
             out (PyTorch Matrix): Actions
         """
+        X1 = X[:, :27]
+        X2 = X[:, 27:36]
+        X3 = X[:, 36:]
+
         onehot = None
         if type(X) is tuple:
             X, onehot = X
-        inp = self.in_fn(X)  # don't batchnorm onehot
-        if onehot is not None:
-            inp = torch.cat((onehot, inp), dim=1)
-        h1 = self.nonlin(self.fc1(inp))
+        inp1 = self.in_fn1(X1)  # don't batchnorm onehot
+        inp2 = self.in_fn2(X2)
+        inp3 = self.in_fn3(X3)
+        #if onehot is not None:
+        #    inp = torch.cat((onehot, inp), dim=1)
+        h1 = self.nonlin(torch.cat([self.fc1_1(inp1), self.fc1_2(inp2), self.fc1_3(inp3)], dim=-1))
         h2 = self.nonlin(self.fc2(h1))
         out = self.fc3(h2)
         return out
+
 
 
 class DiscretePolicy(BasePolicy):
