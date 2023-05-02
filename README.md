@@ -3,6 +3,7 @@
 Code of [FMAAC](https://www.mdpi.com/1996-1073/15/19/7426)(MDPI Energies 2022, 15(19), 7426 (SCIE)
 
 
+<img src="fmaac_architecture.png">
 
 __________________________________________
 
